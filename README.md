@@ -10,6 +10,7 @@ A multi-layer computational pipeline that converts African-cohort variants of un
 - [Pipeline Architecture](#pipeline-architecture)
 - [Project Structure](#project-structure)
 - [Installation](#installation)
+- [Running on Google Colab](#running-on-google-colab)
 - [Quick Start](#quick-start)
 - [Input Format](#input-format)
 - [Usage](#usage)
@@ -115,12 +116,12 @@ african_variant_pipeline/
 
 ```bash
 git clone https://github.com/Meshach-Zm/African-Variant-Triage-Pipeline.git
-cd african_variant_pipeline
+cd African-Variant-Triage-Pipeline
 ```
 
 ### 2. Install AlphaGenome from source
 
-AlphaGenome is not on PyPI and must be installed directly from DeepMind's repository:
+> ⚠️ AlphaGenome is **not on PyPI**. This step must be done before installing `requirements.txt` or you will get `ModuleNotFoundError: No module named 'alphagenome'`.
 
 ```bash
 git clone https://github.com/google-deepmind/alphagenome.git
@@ -152,6 +153,60 @@ ALPHAGENOME_API_KEY=your_api_key_here
 ```
 
 The pipeline loads this automatically at startup via `python-dotenv`. The `.env` file is listed in `.gitignore` and will never be committed. Never paste your API key directly into the command line or source code.
+
+---
+
+## Running on Google Colab
+
+Because Colab's GitHub file browser only shows `.ipynb` files, the recommended way to use this pipeline on Colab is to clone the repo directly into your session.
+
+**Step 1 — Clone the repo**
+
+```python
+!git clone https://github.com/Meshach-Zm/African-Variant-Triage-Pipeline.git
+%cd African-Variant-Triage-Pipeline
+```
+
+**Step 2 — Install AlphaGenome from source**
+
+This must be done before installing `requirements.txt`:
+
+```python
+!git clone https://github.com/google-deepmind/alphagenome.git
+!pip install -q ./alphagenome
+```
+
+**Step 3 — Install remaining dependencies**
+
+```python
+!pip install -r requirements.txt
+```
+
+**Step 4 — Set your API key using Colab Secrets**
+
+Add `ALPHAGENOME_API_KEY` under **Secrets** in the Colab left sidebar (the 🔑 icon), then load it in your notebook:
+
+```python
+import os
+from google.colab import userdata
+os.environ["ALPHAGENOME_API_KEY"] = userdata.get("ALPHAGENOME_API_KEY")
+```
+
+This keeps your key out of the notebook code entirely.
+
+**Step 5 — Run the pipeline**
+
+```python
+!python main.py --output_dir results/
+```
+
+> **Note:** Colab sessions are ephemeral. Any files written to `results/` will be lost when the session ends. Save important outputs to Google Drive:
+>
+> ```python
+> from google.colab import drive
+> drive.mount('/content/drive')
+> !python main.py --output_dir /content/drive/MyDrive/variant_results/
+> ```
 
 ---
 
@@ -358,6 +413,9 @@ All external calls include a `0.5 s` pause between requests (`API_PAUSE` in `con
 ---
 
 ## Troubleshooting
+
+**`ModuleNotFoundError: No module named 'alphagenome'`**
+AlphaGenome is not on PyPI and cannot be installed via `pip install -r requirements.txt` alone. You must clone and install it manually first — see [Installation](#installation) step 2 or the [Colab](#running-on-google-colab) instructions.
 
 **`FileNotFoundError: --skip_alphagenome set but kidney_scores_full.csv not found`**
 Run the pipeline once without `--skip_alphagenome` to generate the cached scores file.

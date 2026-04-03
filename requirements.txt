@@ -5,3 +5,14 @@ requests>=2.31.0
 scipy>=1.11.0
 tqdm>=4.65.0
 python-dotenv>=1.0.0
+
+# AlphaGenome is NOT on PyPI and must be installed separately from source.
+# Run these commands BEFORE pip install -r requirements.txt:
+#
+#   git clone https://github.com/google-deepmind/alphagenome.git
+#   pip install ./alphagenome
+#
+# On Google Colab, run these in a notebook cell:
+#
+#   !git clone https://github.com/google-deepmind/alphagenome.git
+#   !pip install -q ./alphagenome
