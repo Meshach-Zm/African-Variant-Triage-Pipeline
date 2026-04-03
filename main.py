@@ -106,7 +106,7 @@ def main():
         dna_model  = None
     else:
         print("\n--- Layer 1: AlphaGenome ---")
-        dna_model, df_kidney = run_layer1(args.api_key, vcf)
+        dna_model, df_kidney = run_layer1(args.api_key, vcf)  # type: ignore[misc]
         df_kidney.to_csv(output_dir / "kidney_scores_full.csv", index=False)
         print("  Full kidney scores saved.")
 

@@ -8,6 +8,8 @@ kidney-relevant ontology terms, classifies impact, and returns a
 one-row-per-variant summary.
 """
 
+from typing import Any
+
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -64,7 +66,10 @@ def score_variants_alphagenome(
             organism=organism,
         )
         results.append(variant_scores)
-    return variant_scorers.tidy_scores(results)
+    df = variant_scorers.tidy_scores(results)
+    # tidy_scores may store Variant objects in variant_id — normalise to str
+    df["variant_id"] = df["variant_id"].astype(str)
+    return df
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +111,11 @@ def summarise_alphagenome(df: pd.DataFrame) -> pd.DataFrame:
     Collapse to one row per variant: keep the track with the
     highest absolute quantile score.
     """
+    # AlphaGenome's tidy_scores may return Variant objects in variant_id.
+    # Cast to string so pandas can group and hash the column correctly.
+    df = df.copy()
+    df["variant_id"] = df["variant_id"].astype(str)
+
     idx = df.groupby("variant_id")["quantile_score"].apply(
         lambda x: x.abs().idxmax()
     )
@@ -122,7 +132,7 @@ def summarise_alphagenome(df: pd.DataFrame) -> pd.DataFrame:
 # Public entry point for main.py
 # ---------------------------------------------------------------------------
 
-def run_layer1(api_key: str, vcf: pd.DataFrame) -> pd.DataFrame:
+def run_layer1(api_key: str, vcf: pd.DataFrame) -> tuple[Any, pd.DataFrame]:
     """
     Initialise the AlphaGenome model, score all variants, filter to kidney
     tissues, classify impact, and return a per-variant summary dataframe.
