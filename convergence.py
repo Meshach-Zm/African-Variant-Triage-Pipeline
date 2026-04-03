@@ -28,6 +28,7 @@ Maximum possible score : 9
 Actionable threshold   : >= 4  (configurable via config.ACTIONABLE_THRESHOLD)
 """
 
+import numpy as np
 import pandas as pd
 
 from config import ACTIONABLE_THRESHOLD
@@ -36,6 +37,17 @@ from config import ACTIONABLE_THRESHOLD
 # ---------------------------------------------------------------------------
 # Per-variant scoring
 # ---------------------------------------------------------------------------
+
+def _is_valid(value) -> bool:
+    """Return False if value is None, NaN, or an empty string."""
+    if value is None:
+        return False
+    if isinstance(value, float) and np.isnan(value):
+        return False
+    if isinstance(value, str) and value.strip() in ("", "nan"):
+        return False
+    return True
+
 
 def compute_convergence_score(row: pd.Series) -> tuple[int, list[str]]:
     """
@@ -55,7 +67,7 @@ def compute_convergence_score(row: pd.Series) -> tuple[int, list[str]]:
         reasons.append(f"AlphaGenome MODERATE (quantile={row['quantile_score']:.3f})")
 
     # Layer 2 — GTEx eQTL
-    if row.get("gtex_eqtl_found"):
+    if row.get("gtex_eqtl_found") and _is_valid(row.get("gtex_max_nes")):
         points += 2
         reasons.append(
             f"GTEx eQTL in kidney "
@@ -84,12 +96,12 @@ def compute_convergence_score(row: pd.Series) -> tuple[int, list[str]]:
         reasons.append("RegulomeDB: QTL overlap")
 
     # Layer 3 — HWE deviation
-    if row.get("hwe_deviation"):
+    if row.get("hwe_deviation") and _is_valid(row.get("hwe_pvalue")):
         points += 1
         reasons.append(f"HWE deviation in cases (p={row['hwe_pvalue']:.4f})")
 
     # Layer 3 — AF enrichment in cases
-    if row.get("af_enriched_cases"):
+    if row.get("af_enriched_cases") and _is_valid(row.get("case_af")) and _is_valid(row.get("control_af")):
         points += 1
         reasons.append(
             f"AF enriched in cases "
@@ -144,6 +156,16 @@ def _suggest_assay(row: pd.Series) -> str:
     return "; ".join(suggestions)
 
 
+def _fmt(value, fmt=None, fallback="n/a"):
+    """Format a value, returning fallback if it is None or NaN."""
+    try:
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return fallback
+        return format(value, fmt) if fmt else str(value)
+    except (TypeError, ValueError):
+        return fallback
+
+
 def print_action_report(report: pd.DataFrame):
     """Print a plain-text multi-layer triage report to stdout."""
     sep = "-" * 72
@@ -166,13 +188,13 @@ def print_action_report(report: pd.DataFrame):
                 f"  Variant          : {row['variant_id']}\n"
                 f"  Convergence score: {row['convergence_score']} / 9\n"
                 f"  AlphaGenome      : {row['ag_impact']}  "
-                f"(quantile={row['quantile_score']:.3f}, "
-                f"output={row['output_type']}, "
-                f"tissue={row['biosample_name']})\n"
+                f"(quantile={_fmt(row['quantile_score'], '.3f')}, "
+                f"output={_fmt(row['output_type'])}, "
+                f"tissue={_fmt(row['biosample_name'])})\n"
                 f"  GTEx eQTL        : "
-                + ("yes — " + str(row["gtex_genes"]) if row["gtex_eqtl_found"] else "not found")
-                + f"\n  RegulomeDB       : rank={row['regulome_rank']}  "
-                f"probability={row['regulome_probability']:.2f}\n"
+                + ("yes — " + _fmt(row["gtex_genes"]) if row["gtex_eqtl_found"] else "not found")
+                + f"\n  RegulomeDB       : rank={_fmt(row['regulome_rank'])}  "
+                f"probability={_fmt(row['regulome_probability'], '.2f')}\n"
                 f"  Evidence         : {row['evidence_summary']}\n"
                 f"  Suggested assay  : {_suggest_assay(row)}\n"
             )
