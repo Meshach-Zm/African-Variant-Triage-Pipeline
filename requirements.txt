@@ -5,7 +5,3 @@ requests>=2.31.0
 scipy>=1.11.0
 tqdm>=4.65.0
 python-dotenv>=1.0.0
-
-# AlphaGenome — install from source:
-# git clone https://github.com/google-deepmind/alphagenome.git
-# pip install ./alphagenome
