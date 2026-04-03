@@ -114,7 +114,7 @@ african_variant_pipeline/
 ### 1. Clone this repository
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/Meshach-Zm/African-Variant-Triage-Pipeline.git
 cd african_variant_pipeline
 ```
 
