@@ -1,0 +1,5 @@
+variant_id,output_type,biosample_name,raw_score,quantile_score,ag_impact,gtex_eqtl_found,gtex_tissues,gtex_max_nes,gtex_min_pvalue,gtex_genes,regulome_found,regulome_rank,regulome_probability,regulome_has_chip,regulome_has_dnase,regulome_has_qtl,regulome_has_footprint,hwe_pvalue,hwe_deviation,case_af,control_af,af_difference,af_enriched_cases,pop_data_available,convergence_score,evidence_summary,action_recommended
+chr1:153925321:G>A,RNA_SEQ,kidney,22.549788,0.99999,HIGH,,,,,,,,,,,,,,,,,,,,4,AlphaGenome HIGH (quantile=1.000) | RegulomeDB: TF ChIP + DNase overlap | RegulomeDB: QTL overlap,True
+chr22:36201698:A>C,SPLICE_JUNCTIONS,cortex of kidney,4.9375,0.99999,HIGH,,,,,,,,,,,,,,,,,,,,4,AlphaGenome HIGH (quantile=1.000) | RegulomeDB: TF ChIP + DNase overlap | RegulomeDB: QTL overlap,True
+chr12:111803962:C>T,RNA_SEQ,kidney,-0.04547453,-0.99962544,HIGH,,,,,,,,,,,,,,,,,,,,4,AlphaGenome HIGH (quantile=-1.000) | RegulomeDB: TF ChIP + DNase overlap | RegulomeDB: QTL overlap,True
+chr3:58394738:A>T,RNA_SEQ,kidney,-0.008780003,-0.99013096,HIGH,,,,,,,,,,,,,,,,,,,,4,AlphaGenome HIGH (quantile=-0.990) | RegulomeDB: TF ChIP + DNase overlap | RegulomeDB: QTL overlap,True

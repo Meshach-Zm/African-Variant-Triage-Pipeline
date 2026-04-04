@@ -34,10 +34,10 @@ SEQUENCE_LENGTH_KEY = "SEQUENCE_LENGTH_1MB"
 # ---------------------------------------------------------------------------
 # External API endpoints
 # ---------------------------------------------------------------------------
-# GTEx API v2 base URL — no longer used.
-# The API is gene-centric and cannot accept variant-only queries.
-# GTEx lookups now use bulk download files via layer2_crossref.py.
-# GTEX_API = "https://gtexportal.org/api/v2"
+# GTEx API v2 base URL.
+# We use the singleTissueEqtlByLocation endpoint which accepts
+# chromosome + position without requiring a gene ID.
+GTEX_API = "https://gtexportal.org/api/v2"
 
 # RegulomeDB search endpoint (returns JSON).
 REGULOME_API = "https://regulomedb.org/regulome-search/"

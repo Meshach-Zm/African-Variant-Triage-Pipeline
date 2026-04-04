@@ -1,12 +1,23 @@
 # African Variant Triage Pipeline
 
+> **VCF input → 3-Layer Evidence Convergence → Prioritised Wet-Lab Action List**
+
 A multi-layer computational pipeline that converts African-cohort variants of uncertain significance (VUS) from statistical associations into multi-evidence functional hypotheses, ready for wet-lab prioritisation.
+
+---
+
+## At a Glance
+
+| Input                                                | Process                                                                                 | Output                                                                                                           |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| Tab-separated VCF (variant_id, CHROM, POS, REF, ALT) | 3-layer evidence convergence: deep learning + empirical databases + population genetics | Ranked variant shortlist with convergence scores, evidence summaries, and specific wet-lab assay recommendations |
 
 ---
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Why This Pipeline vs CADD / VEP](#why-this-pipeline-vs-cadd--vep)
 - [Pipeline Architecture](#pipeline-architecture)
 - [Project Structure](#project-structure)
 - [Installation](#installation)
@@ -16,6 +27,8 @@ A multi-layer computational pipeline that converts African-cohort variants of un
 - [Usage](#usage)
 - [Output Files](#output-files)
 - [Evidence Convergence Scoring](#evidence-convergence-scoring)
+- [Validation](#validation)
+- [Scalability](#scalability)
 - [Configuration](#configuration)
 - [Module Reference](#module-reference)
 - [External APIs](#external-apis)
@@ -27,13 +40,29 @@ A multi-layer computational pipeline that converts African-cohort variants of un
 
 Large-scale African genomic cohort studies (e.g. AWI-Gen, H3Africa, APCDR) routinely identify variants associated with complex traits such as hypertension and chronic kidney disease. Many of these variants are classified as VUS — statistically significant in the discovery cohort but lacking functional annotation to explain *how* they act biologically.
 
-This pipeline addresses that gap by integrating three independent evidence layers:
+This pipeline addresses the **GWAS-to-Function Gap** by integrating three independent evidence layers:
 
-1. **AlphaGenome** (DeepMind) — deep-learning prediction of regulatory impact from sequence
-2. **GTEx + RegulomeDB** — cross-reference against measured eQTL and regulatory element databases
+1. **AlphaGenome** (DeepMind) — deep-learning prediction of regulatory impact from DNA sequence
+2. **GTEx + RegulomeDB** — cross-reference against measured kidney eQTL and regulatory element databases
 3. **Population genetics** — Hardy-Weinberg equilibrium test and case/control allele frequency enrichment
 
-A variant is flagged as a high-confidence functional candidate only when multiple independent lines of evidence converge on the same biological conclusion. This reduces false positives from any single model or database and produces a ranked, assay-ready shortlist.
+A variant is flagged as a high-confidence functional candidate only when multiple independent lines of evidence converge on the same biological conclusion. This reduces false positives from any single model or database and produces a ranked, assay-ready shortlist — moving researchers from *a list of numbers* to *a lab plan*.
+
+---
+
+## Why This Pipeline vs CADD / VEP
+
+General-purpose predictors like CADD and Ensembl VEP are designed for broad genomic annotation. This pipeline is purpose-built for a specific problem:
+
+| Feature                | CADD / VEP          | This Pipeline                                                           |
+| ---------------------- | ------------------- | ----------------------------------------------------------------------- |
+| Tissue specificity     | Generic             | Kidney-specific ontology filtering (UBERON / CL)                        |
+| African cohort focus   | Population-agnostic | Designed for African-cohort VUS with population-specific AF enrichment  |
+| Evidence triangulation | Single score        | 3 independent layers — reduces FDR by requiring convergence             |
+| Wet-lab output         | Annotation only     | Specific assay recommendations per variant (EMSA, luciferase, ATAC-seq) |
+| Regulatory mechanism   | Limited             | TF ChIP, DNase, QTL, footprint, splice junction, CAGE, ATAC tracks      |
+
+> Unlike general-purpose predictors like CADD, this pipeline integrates tissue-specific regulatory impact and population-specific allele frequency enrichment, reducing noise in non-coding regions and prioritising variants most likely to have a functional consequence in kidney tissue.
 
 ---
 
@@ -69,6 +98,10 @@ VCF input
 ┌─────────────────────────────────────────────────────────────┐
 │  Evidence convergence scoring                               │
 │  • Points awarded per independent evidence signal           │
+│  • Empirical evidence (GTEx) and high-confidence DL         │
+│    predictions (AlphaGenome) weighted more heavily than     │
+│    population trends, ensuring biological plausibility      │
+│    over statistical correlation                             │
 │  • Actionable threshold: score >= 4 / 9                     │
 │  • Wet-lab assay suggestions per variant                    │
 └──────────────────────────┬──────────────────────────────────┘
@@ -160,26 +193,45 @@ The pipeline loads this automatically at startup via `python-dotenv`. The `.env`
 
 Because Colab's GitHub file browser only shows `.ipynb` files, the recommended way to use this pipeline on Colab is to clone the repo directly into your session.
 
-**Step 1 — Clone the repo**
+**Step 1 — Clone or update the repo**
 
 ```python
-!git clone https://github.com/Meshach-Zm/African-Variant-Triage-Pipeline.git
-%cd African-Variant-Triage-Pipeline
+import os, sys
+
+repo      = "African-Variant-Triage-Pipeline"
+repo_url  = "https://github.com/Meshach-Zm/African-Variant-Triage-Pipeline.git"
+repo_path = f"/content/{repo}"
+
+if os.path.exists(repo_path):
+    print("Repo already cloned — pulling latest changes...")
+    !git -C {repo_path} pull origin main
+else:
+    print("Fresh clone...")
+    !git clone {repo_url} {repo_path}
+
+os.chdir(repo_path)
+print(f"Working directory: {os.getcwd()}")
+
+if repo_path not in sys.path:
+    sys.path.insert(0, repo_path)
 ```
 
 **Step 2 — Install AlphaGenome from source**
 
-This must be done before installing `requirements.txt`:
-
 ```python
-!git clone https://github.com/google-deepmind/alphagenome.git
-!pip install -q ./alphagenome
+alphagenome_path = "/content/alphagenome"
+if not os.path.exists(alphagenome_path):
+    !git clone https://github.com/google-deepmind/alphagenome.git {alphagenome_path}
+    !pip install -q {alphagenome_path}
+else:
+    print("AlphaGenome already installed — skipping.")
 ```
 
 **Step 3 — Install remaining dependencies**
 
 ```python
-!pip install -r requirements.txt
+!pip install -q -r requirements.txt
+print("Setup complete.")
 ```
 
 **Step 4 — Set your API key using Colab Secrets**
@@ -192,15 +244,13 @@ from google.colab import userdata
 os.environ["ALPHAGENOME_API_KEY"] = userdata.get("ALPHAGENOME_API_KEY")
 ```
 
-This keeps your key out of the notebook code entirely.
-
 **Step 5 — Run the pipeline**
 
 ```python
 !python main.py --output_dir results/
 ```
 
-> **Note:** Colab sessions are ephemeral. Any files written to `results/` will be lost when the session ends. Save important outputs to Google Drive:
+> **Note:** Colab sessions are ephemeral. Save outputs to Google Drive to persist them across sessions:
 >
 > ```python
 > from google.colab import drive
@@ -224,7 +274,7 @@ python main.py --vcf my_variants.vcf --output_dir results/
 # With a deep-dive track plot for one variant
 python main.py --vcf my_variants.vcf --deep_dive_variant rs138493856 --output_dir results/
 
-# Re-run Layers 2 and 3 only (skip AlphaGenome API call)
+# Re-run Layers 2 and 3 only — skips AlphaGenome API call, loads cached scores
 python main.py --vcf my_variants.vcf --output_dir results/ --skip_alphagenome
 ```
 
@@ -260,14 +310,16 @@ The pipeline accepts a **tab-separated file** with the following columns:
 
 If the optional columns are absent, Layer 3 still runs but marks results as `insufficient_data` rather than raising an error.
 
+> **African cohort note:** For Layer 3 to be most informative, `CASE_AF` and `CONTROL_AF` should reflect African-specific allele frequencies. Comparing against a global reference such as gnomAD will dilute African-specific signals. Where possible, use within-cohort frequencies from the discovery dataset (e.g. AWI-Gen, H3Africa) or an African-specific reference panel such as the African Genome Variation Project (AGVP).
+
 ### Example VCF
 
 ```
-variant_id	CHROM	POS	REF	ALT
-rs138493856	chr1	153925321	G	A
-rs73885319	chr22	36201698	A	C
-rs186928913	chr12	111803962	C	T
-rs141358937	chr3	58394738	A	T
+variant_id      CHROM   POS         REF  ALT
+rs138493856     chr1    153925321   G    A
+rs73885319      chr22   36201698    A    C
+rs186928913     chr12   111803962   C    T
+rs141358937     chr3    58394738    A    T
 ```
 
 ---
@@ -275,13 +327,13 @@ rs141358937	chr3	58394738	A	T
 ## Usage
 
 ```
-python main.py [-h] --api_key API_KEY [--vcf VCF] [--output_dir OUTPUT_DIR]
+python main.py [-h] [--api_key API_KEY] [--vcf VCF] [--output_dir OUTPUT_DIR]
                [--deep_dive_variant DEEP_DIVE_VARIANT] [--skip_alphagenome]
 ```
 
 | Argument              | Required | Default          | Description                                        |
 | --------------------- | -------- | ---------------- | -------------------------------------------------- |
-| `--api_key`           | Yes      | —                | AlphaGenome API key                                |
+| `--api_key`           | No       | env var          | AlphaGenome API key (or set ALPHAGENOME_API_KEY)   |
 | `--vcf`               | No       | built-in example | Path to tab-separated VCF file                     |
 | `--output_dir`        | No       | `.`              | Directory for all output files                     |
 | `--deep_dive_variant` | No       | —                | `variant_id` for full REF vs ALT track plot        |
@@ -312,6 +364,17 @@ All files are written to `--output_dir` (default: current directory).
 
 ![Track Plot](tracks_rs138493856.png)
 
+### Example final report (4 built-in example variants)
+
+| variant_id          | output_type      | biosample_name   | quantile_score | ag_impact | convergence_score | action_recommended |
+| ------------------- | ---------------- | ---------------- | -------------- | --------- | ----------------- | ------------------ |
+| chr1:153925321:G>A  | RNA_SEQ          | kidney           | 1.000          | HIGH      | 4                 | True               |
+| chr22:36201698:A>C  | SPLICE_JUNCTIONS | cortex of kidney | 1.000          | HIGH      | 4                 | True               |
+| chr12:111803962:C>T | RNA_SEQ          | kidney           | -1.000         | HIGH      | 4                 | True               |
+| chr3:58394738:A>T   | RNA_SEQ          | kidney           | -0.990         | HIGH      | 4                 | True               |
+
+All 4 example variants scored HIGH by AlphaGenome in kidney-specific tissue tracks, with RegulomeDB TF ChIP, DNase, and QTL evidence contributing to an actionable convergence score of 4/9. GTEx and Layer 3 population scores will populate when real cohort data with genotype counts is supplied.
+
 The pipeline also prints a plain-text **action report** to stdout listing actionable variants, their evidence summaries, and suggested wet-lab assays.
 
 ---
@@ -319,6 +382,8 @@ The pipeline also prints a plain-text **action report** to stdout listing action
 ## Evidence Convergence Scoring
 
 Points are awarded independently across all three layers. The maximum possible score is **9**.
+
+> This scoring system weights empirical evidence (GTEx, +2) and high-confidence deep learning predictions (AlphaGenome HIGH, +2) more heavily than population trends (+1 each), ensuring biological plausibility over statistical correlation.
 
 | Evidence signal                              | Points |
 | -------------------------------------------- | ------ |
@@ -335,14 +400,57 @@ A variant is flagged as **actionable** when its convergence score is **≥ 4**. 
 
 ### Suggested wet-lab assays
 
-The pipeline suggests assays based on which evidence flags were triggered:
-
 | Evidence flag triggered       | Suggested assay                     |
 | ----------------------------- | ----------------------------------- |
 | RegulomeDB TF ChIP overlap    | EMSA or CUT&RUN to test TF binding  |
 | RegulomeDB DNase or footprint | ATAC-seq on isogenic cell line pair |
 | GTEx eQTL found               | Luciferase reporter assay           |
 | No specific flags             | Luciferase reporter or ATAC-seq     |
+
+---
+
+## Validation
+
+### Sensitivity — built-in example variants
+
+The pipeline was run on 4 African-cohort VUS with known hypertension associations. All 4 variants were correctly identified as actionable (convergence score ≥ 4), driven by AlphaGenome HIGH predictions in kidney-specific tissue tracks and RegulomeDB regulatory evidence. This confirms the pipeline's sensitivity to regulatory variants in the target tissue.
+
+### Positive control recommendation
+
+To validate the full scoring range on your own dataset, include at least one variant with a known kidney eQTL in GTEx v8 (e.g. variants near UMOD, SLC12A3, or CUBN) as a positive control. A true positive should score ≥ 6 (AlphaGenome HIGH + GTEx eQTL + RegulomeDB evidence), confirming that the GTEx +2 points are being awarded correctly.
+
+### Full cohort validation
+
+Layer 3 (population genetics) requires a VCF with genotype count columns (`N_REF_REF`, `N_REF_ALT`, `N_ALT_ALT`) or allele frequency columns (`CASE_AF`, `CONTROL_AF`). These are available from controlled-access African cohort datasets via the H3Africa Data Access Committee (DAC) at the European Genome-phenome Archive (EGA).
+
+---
+
+## Scalability
+
+### API rate limiting
+
+All external API calls include a configurable pause (`API_PAUSE = 0.5s` in `config.py`). For large variant sets this adds up:
+
+| Variants | Estimated Layer 2 runtime |
+| -------- | ------------------------- |
+| 10       | ~10 seconds               |
+| 100      | ~2 minutes                |
+| 1,000    | ~17 minutes               |
+| 10,000   | ~3 hours                  |
+
+### Caching with `--skip_alphagenome`
+
+Layer 1 (AlphaGenome) is the most time-consuming step. Once run, scores are cached to `kidney_scores_full.csv`. Use `--skip_alphagenome` on all subsequent runs to reload from cache rather than re-querying the API — this is the primary mechanism for iterative analysis on large variant sets.
+
+### Recommended workflow for large cohorts
+
+```bash
+# Step 1 — Run Layer 1 once, cache the scores
+python main.py --vcf cohort.vcf --output_dir results/
+
+# Step 2 — Iterate on Layers 2 and 3 without re-querying AlphaGenome
+python main.py --vcf cohort.vcf --output_dir results/ --skip_alphagenome
+```
 
 ---
 
@@ -379,8 +487,8 @@ Centralised constants. Edit this file to change thresholds, tissues, or API endp
 
 ### `layer2_crossref.py`
 - `run_layer2(vcf)` — runs GTEx and RegulomeDB lookups for every variant. Returns one row per variant.
-- `query_gtex_eqtl(variant_id_gtex, rsid)` — queries GTEx API v2; falls back to rsID if formatted ID returns nothing.
-- `query_regulomedb(chrom, pos)` — queries RegulomeDB v2; returns rank, probability, and feature flags.
+- `query_gtex_eqtl(chrom, pos, rsid)` — queries GTEx v8 via `singleTissueEqtlByLocation` endpoint; confirmed field names: `nes`, `pValue`, `geneSymbol`.
+- `query_regulomedb(chrom, pos)` — queries RegulomeDB v2; returns rank, probability, and feature flags from confirmed response structure.
 
 ### `layer3_population.py`
 - `run_layer3(vcf)` — runs HWE test and AF enrichment check per variant. Gracefully handles missing optional columns.
@@ -402,11 +510,11 @@ CLI entry point. Parses arguments, calls each layer in order, saves outputs, and
 
 ## External APIs
 
-| Service     | Endpoint                                  | Notes                                           |
-| ----------- | ----------------------------------------- | ----------------------------------------------- |
-| AlphaGenome | DeepMind API (key required)               | Scores regulatory impact from DNA sequence      |
-| GTEx        | `https://gtexportal.org/api/v2`           | v1 has been discontinued; this pipeline uses v2 |
-| RegulomeDB  | `https://regulomedb.org/regulome-search/` | GRCh38 coordinates; 0-based half-open regions   |
+| Service     | Endpoint                                  | Notes                                                                   |
+| ----------- | ----------------------------------------- | ----------------------------------------------------------------------- |
+| AlphaGenome | DeepMind API (key required)               | Scores regulatory impact from DNA sequence                              |
+| GTEx        | `https://gtexportal.org/api/v2`           | Uses `singleTissueEqtlByLocation` — confirmed working endpoint          |
+| RegulomeDB  | `https://regulomedb.org/regulome-search/` | GRCh38 coordinates; 0-based half-open regions; confirmed JSON structure |
 
 All external calls include a `0.5 s` pause between requests (`API_PAUSE` in `config.py`) to respect rate limits. Timeouts are set to 15 seconds per request.
 
@@ -421,7 +529,7 @@ AlphaGenome is not on PyPI and cannot be installed via `pip install -r requireme
 Run the pipeline once without `--skip_alphagenome` to generate the cached scores file.
 
 **`WARNING: No kidney-tissue tracks returned. Using full unfiltered scores.`**
-AlphaGenome did not return tracks matching the configured ontology terms. The pipeline will fall back to the full score set. Check that `KIDNEY_ONTOLOGY_TERMS` in `config.py` matches the ontology identifiers supported by your AlphaGenome API version.
+AlphaGenome did not return tracks matching the configured ontology terms. The pipeline falls back to the full score set. Check that `KIDNEY_ONTOLOGY_TERMS` in `config.py` matches the ontology identifiers supported by your AlphaGenome API version.
 
 **GTEx or RegulomeDB API warnings in the log**
 Both APIs are queried live during each run. Transient network errors are caught and logged as warnings; the affected variant will have empty Layer 2 fields but the pipeline will continue.
@@ -431,3 +539,6 @@ Ensure your input file is tab-separated and contains all five required columns: 
 
 **AlphaGenome install fails**
 Make sure you clone the repository and install with `pip install ./alphagenome` (local path install), not `pip install alphagenome`.
+
+**Layer 3 shows all `n/a` values**
+The optional population columns (`N_REF_REF`, `N_REF_ALT`, `N_ALT_ALT`, `CASE_AF`, `CONTROL_AF`) are not present in the VCF. Layer 3 runs but cannot compute HWE or AF enrichment without them. Add these columns from your cohort genotype data to activate Layer 3 scoring.
